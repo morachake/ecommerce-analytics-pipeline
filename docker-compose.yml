@@ -11,7 +11,7 @@ services:
       - postgres_db_volume:/var/lib/postgresql/data
       - ./infrastructure/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     ports:
-      - "5432:5432"
+      - "5434:5432"
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 5s
@@ -121,9 +121,9 @@ services:
       - warehouse_db_volume:/var/lib/postgresql/data
       - ./infrastructure/warehouse-init.sql:/docker-entrypoint-initdb.d/warehouse-init.sql
     ports:
-      - "5433:5432"
+      - "5435:5432"
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "warehouse"]
+      test: ["CMD", "pg_isready", "-U", "warehouse", "-d", "ecommerce_dw"]
       interval: 5s
       retries: 5
 

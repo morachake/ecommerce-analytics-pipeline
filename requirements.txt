@@ -1,7 +1,10 @@
+cffi==1.17.1
+cryptography==42.0.5
 Faker==37.4.0
-numpy==2.3.1
+numpy==2.2.6
 pandas==2.3.1
 psycopg2-binary==2.9.10
+pycparser==2.22
 python-dateutil==2.9.0.post0
 pytz==2025.2
 PyYAML==6.0.2
