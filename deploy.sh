@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# E-commerce Analytics Pipeline Deployment Script
+# E-commerce Analytics Pipeline Deployment Script with proper Airflow initialization
 # Usage: ./deploy.sh [environment]
 # Environment: dev (default) or prod
 
@@ -40,20 +40,24 @@ check_prerequisites() {
     echo "✅ Prerequisites check passed"
 }
 
-# Setup environment
+# Setup environment with proper Fernet key
 setup_environment() {
     echo "🔧 Setting up $ENVIRONMENT environment..."
     
-    # Check if .env file exists
+    # Check if .env file exists and validate Fernet key
     if [ ! -f .env ]; then
         echo "📝 Creating .env file..."
         
-        # Generate Fernet key
+        # Generate proper Fernet key
         if command -v python3 &> /dev/null; then
-            FERNET_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" 2>/dev/null || echo "your-fernet-key-here-replace-with-generated-key")
+            FERNET_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())" 2>/dev/null)
+            if [ -z "$FERNET_KEY" ]; then
+                echo "❌ Failed to generate Fernet key"
+                exit 1
+            fi
         else
-            FERNET_KEY="your-fernet-key-here-replace-with-generated-key"
-            echo "⚠️  Python3 not found. Using placeholder Fernet key. Please generate a proper key later."
+            echo "❌ Python3 not found. Cannot generate Fernet key."
+            exit 1
         fi
         
         cat > .env << EOF
@@ -74,9 +78,18 @@ WAREHOUSE_DB=ecommerce_dw
 # dbt Configuration
 DBT_TARGET=${ENVIRONMENT}
 EOF
-        echo "✅ .env file created"
+        echo "✅ .env file created with Fernet key: ${FERNET_KEY}"
     else
-        echo "✅ .env file already exists"
+        # Check if existing .env has proper Fernet key
+        CURRENT_KEY=$(grep "AIRFLOW__CORE__FERNET_KEY=" .env | cut -d'=' -f2)
+        if [[ "$CURRENT_KEY" == "your-fernet-key-here"* ]] || [ -z "$CURRENT_KEY" ]; then
+            echo "🔑 Updating invalid Fernet key in .env..."
+            NEW_FERNET_KEY=$(python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+            sed -i.bak "s/AIRFLOW__CORE__FERNET_KEY=.*/AIRFLOW__CORE__FERNET_KEY=${NEW_FERNET_KEY}/" .env
+            echo "✅ Updated Fernet key: ${NEW_FERNET_KEY}"
+        else
+            echo "✅ .env file exists with valid Fernet key"
+        fi
     fi
     
     # Create necessary directories
@@ -137,7 +150,7 @@ generate_data() {
     fi
 }
 
-# Build and start services
+# Build and start services with proper initialization
 start_services() {
     echo "🐳 Building and starting Docker services..."
     
@@ -149,52 +162,56 @@ start_services() {
     echo "🔨 Building Docker images..."
     docker-compose build --no-cache
     
-    # Start services
-    echo "🚀 Starting services..."
-    docker-compose up -d
+    # Start databases first
+    echo "🗄️ Starting databases..."
+    docker-compose up -d postgres warehouse redis
     
-    # Wait for services to be healthy
-    echo "⏳ Waiting for services to be ready..."
-    
-    # Wait for PostgreSQL (Airflow)
-    echo "Waiting for Airflow PostgreSQL..."
+    # Wait for databases to be healthy
+    echo "⏳ Waiting for databases to be ready..."
     timeout=60
     while [ $timeout -gt 0 ]; do
-        if docker-compose exec -T postgres pg_isready -U airflow 2>/dev/null; then
+        if docker-compose exec -T postgres pg_isready -U airflow 2>/dev/null && \
+           docker-compose exec -T warehouse pg_isready -U warehouse 2>/dev/null; then
+            echo "✅ Databases are ready!"
             break
         fi
+        echo "Waiting for databases... ($((60-timeout))s)"
         sleep 2
         timeout=$((timeout-2))
     done
     
     if [ $timeout -le 0 ]; then
-        echo "❌ Airflow PostgreSQL failed to start"
+        echo "❌ Databases failed to start"
         return 1
     fi
     
-    # Wait for warehouse
-    echo "Waiting for warehouse database..."
-    timeout=60
-    while [ $timeout -gt 0 ]; do
-        if docker-compose exec -T warehouse pg_isready -U warehouse 2>/dev/null; then
-            break
-        fi
-        sleep 2
-        timeout=$((timeout-2))
-    done
+    # Initialize Airflow database
+    echo "🔧 Initializing Airflow database..."
+    docker-compose run --rm airflow-webserver airflow db init
     
-    if [ $timeout -le 0 ]; then
-        echo "❌ Warehouse database failed to start"
-        return 1
-    fi
+    # Create admin user
+    echo "👤 Creating Airflow admin user..."
+    docker-compose run --rm airflow-webserver airflow users create \
+        --username admin \
+        --firstname Admin \
+        --lastname User \
+        --role Admin \
+        --email admin@example.com \
+        --password admin
+    
+    # Start Airflow services
+    echo "🚀 Starting Airflow services..."
+    docker-compose up -d airflow-webserver airflow-scheduler airflow-worker
     
     # Wait for Airflow webserver
-    echo "Waiting for Airflow webserver..."
+    echo "⏳ Waiting for Airflow webserver..."
     timeout=120
     while [ $timeout -gt 0 ]; do
         if curl -f http://localhost:8080/health &> /dev/null; then
+            echo "✅ Airflow webserver is ready!"
             break
         fi
+        echo "Waiting for Airflow webserver... ($((120-timeout))s)"
         sleep 5
         timeout=$((timeout-5))
     done
@@ -208,7 +225,7 @@ start_services() {
     echo "✅ All services are ready"
 }
 
-# Initialize databases and dbt
+# Initialize dbt
 init_dbt() {
     echo "🗄️ Initializing dbt..."
     
@@ -299,7 +316,7 @@ show_access_info() {
     echo "   Username:          admin"
     echo "   Password:          admin"
     echo ""
-    echo "🗄️ Warehouse DB:      localhost:5433"
+    echo "🗄️ Warehouse DB:      localhost:5435"
     echo "   Database:          ecommerce_dw"
     echo "   Username:          warehouse"
     echo "   Password:          warehouse"
@@ -327,7 +344,7 @@ cleanup_on_error() {
     echo ""
     echo "🔍 Troubleshooting tips:"
     echo "1. Check Docker is running: docker info"
-    echo "2. Check ports are free: netstat -an | grep -E ':(5432|5433|6379|8080)'"
+    echo "2. Check ports are free: netstat -an | grep -E ':(5434|5435|6379|8080)'"
     echo "3. Check logs: docker-compose logs"
     echo "4. Try again: ./deploy.sh dev"
     exit 1
@@ -355,7 +372,7 @@ main() {
     echo "🎯 Next steps:"
     echo "1. Visit http://localhost:8080 to access Airflow"
     echo "2. Monitor the 'ecommerce_etl_pipeline' DAG execution"
-    echo "3. Explore your data warehouse at localhost:5433"
+    echo "3. Explore your data warehouse at localhost:5435"
 }
 
 # Run main function with all arguments
