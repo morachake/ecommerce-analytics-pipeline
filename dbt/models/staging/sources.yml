@@ -1,0 +1,133 @@
+version: 2
+
+sources:
+  - name: raw
+    description: Raw data from source systems
+    schema: raw
+    
+    tables:
+      - name: customers
+        description: Customer master data
+        columns:
+          - name: customer_id
+            description: Unique customer identifier
+            tests:
+              - unique
+              - not_null
+          - name: email
+            description: Customer email address
+            tests:
+              - not_null
+              - unique
+          - name: registration_date
+            description: Date customer registered
+            tests:
+              - not_null
+        
+        # Freshness check - data should be loaded within 24 hours
+        freshness:
+          warn_after: {count: 12, period: hour}
+          error_after: {count: 24, period: hour}
+          
+      - name: products
+        description: Product catalog
+        columns:
+          - name: product_id
+            description: Unique product identifier
+            tests:
+              - unique
+              - not_null
+          - name: price
+            description: Product price
+            tests:
+              - not_null
+          - name: cost
+            description: Product cost
+            tests:
+              - not_null
+        
+        freshness:
+          warn_after: {count: 24, period: hour}
+          error_after: {count: 48, period: hour}
+          
+      - name: orders
+        description: Order transactions
+        columns:
+          - name: order_id
+            description: Unique order identifier
+            tests:
+              - unique
+              - not_null
+          - name: customer_id
+            description: Customer who placed the order
+            tests:
+              - not_null
+              - relationships:
+                  to: source('raw', 'customers')
+                  field: customer_id
+          - name: order_date
+            description: Date order was placed
+            tests:
+              - not_null
+          - name: total_amount
+            description: Total order amount
+            tests:
+              - not_null
+        
+        freshness:
+          warn_after: {count: 6, period: hour}
+          error_after: {count: 12, period: hour}
+          
+      - name: order_items
+        description: Individual items within orders
+        columns:
+          - name: order_item_id
+            description: Unique order item identifier
+            tests:
+              - unique
+              - not_null
+          - name: order_id
+            description: Order this item belongs to
+            tests:
+              - not_null
+              - relationships:
+                  to: source('raw', 'orders')
+                  field: order_id
+          - name: product_id
+            description: Product purchased
+            tests:
+              - not_null
+              - relationships:
+                  to: source('raw', 'products')
+                  field: product_id
+          - name: quantity
+            description: Quantity purchased
+            tests:
+              - not_null
+        
+        freshness:
+          warn_after: {count: 6, period: hour}
+          error_after: {count: 12, period: hour}
+          
+      - name: web_events
+        description: Website clickstream events
+        columns:
+          - name: event_id
+            description: Unique event identifier
+            tests:
+              - unique
+              - not_null
+          - name: event_timestamp
+            description: When the event occurred
+            tests:
+              - not_null
+          - name: event_type
+            description: Type of event
+            tests:
+              - not_null
+              - accepted_values:
+                  values: ['page_view', 'add_to_cart', 'remove_from_cart', 'purchase', 'search', 'login', 'logout']
+        
+        freshness:
+          warn_after: {count: 2, period: hour}
+          error_after: {count: 6, period: hour}

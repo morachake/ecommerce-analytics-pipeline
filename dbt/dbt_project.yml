@@ -1,0 +1,66 @@
+name: 'ecommerce_analytics'
+version: '1.0.0'
+config-version: 2
+
+# This setting configures which "profile" dbt uses for this project.
+profile: 'ecommerce_analytics'
+
+# These configurations specify where dbt should look for different types of files.
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+target-path: "target"
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Model configurations
+models:
+  ecommerce_analytics:
+    # Staging models - materialized as views for development speed
+    staging:
+      +materialized: view
+      +schema: staging
+    
+    # Warehouse models - materialized as tables for performance
+    warehouse:
+      +materialized: table
+      +schema: warehouse
+      
+    # Marts models - materialized as tables, partitioned where appropriate
+    marts:
+      +materialized: table
+      +schema: marts
+
+# Test configurations
+tests:
+  +store_failures: true
+  +schema: test_failures
+
+# Snapshot configurations
+snapshots:
+  +target_schema: snapshots
+  +strategy: timestamp
+  +updated_at: updated_at
+
+# Seed configurations
+seeds:
+  +schema: seeds
+
+# Variables
+vars:
+  # Default date range for incremental models
+  start_date: '2022-01-01'
+  end_date: '2024-12-31'
+  
+  # Data quality thresholds
+  min_order_value: 0.01
+  max_order_value: 10000
+  
+  # Business rules
+  customer_churn_days: 90
+  high_value_threshold: 1000
