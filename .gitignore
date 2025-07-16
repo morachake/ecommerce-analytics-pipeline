@@ -24,36 +24,104 @@ wheels/
 venv/
 env/
 ENV/
+
+# Environment files
 .env
+.env.local
+.env.production
+.env.test
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*.sublime-project
+*.sublime-workspace
 
-# dbt
+# dbt - Generated artifacts (should NOT be committed)
 dbt/target/
 dbt/dbt_packages/
 dbt/logs/
-dbt/profiles.yml
+dbt/profiles.yml  # Contains sensitive connection info
 
-# Airflow
+# dbt - Documentation (SHOULD be committed for portfolio)
+# dbt/target/index.html
+# dbt/target/manifest.json
+# dbt/target/catalog.json
+
+# Airflow - Generated files and logs (should NOT be committed)
 airflow/logs/
 airflow/webserver_config.py
+airflow/airflow.cfg
+airflow/airflow.db
+airflow/unittests.cfg
 
-# Data
+# Data files (should NOT be committed - too large)
 data/*.csv
 data/*.json
 data/*.parquet
+data/*.xlsx
+data/*.txt
 
 # Docker
-.env.local
 docker-compose.override.yml
+.docker/
 
 # OS
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
 # Logs
 *.log
+logs/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Secrets and credentials
+secrets/
+credentials/
+*.pem
+*.key
+*.crt
+
+# Backup files
+*.bak
+*.backup
