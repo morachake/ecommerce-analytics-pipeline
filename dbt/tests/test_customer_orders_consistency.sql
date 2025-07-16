@@ -1,4 +1,5 @@
 -- Test to ensure customer order counts are consistent between dim_customers and fact_orders
+-- This test will fail if there are any customers with mismatched order counts
 
 WITH customer_dim_orders AS (
     SELECT 
@@ -30,7 +31,6 @@ comparison AS (
     WHERE d.dim_order_count != f.fact_order_count
 )
 
--- This test will fail if there are any customers with mismatched order counts
 SELECT *
 FROM comparison
 WHERE order_count_diff > 0

@@ -1,6 +1,6 @@
 {{ config(
-    materialized='view',
-    unique_key='customer_id'
+    materialized="view",
+    unique_key="customer_id"
 ) }}
 
 WITH source_data AS (
@@ -20,7 +20,7 @@ WITH source_data AS (
         birth_date,
         UPPER(gender) AS gender,
         loaded_at
-    FROM {{ source('raw', 'customers') }}
+    FROM {{ source("raw", "customers") }}
     WHERE customer_id IS NOT NULL
         AND email IS NOT NULL
         AND email LIKE '%@%'
@@ -39,7 +39,7 @@ enriched_data AS (
             ELSE '65+'
         END AS age_group,
         EXTRACT(YEAR FROM AGE(birth_date)) AS age,
-        EXTRACT(DAYS FROM (CURRENT_DATE - registration_date)) AS days_since_registration
+        (CURRENT_DATE - registration_date) AS days_since_registration
     FROM source_data
 )
 

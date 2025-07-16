@@ -1,0 +1,12 @@
+version: 2
+
+tests:
+  - name: test_customer_orders_consistency
+    description: Ensure customer order counts match between dimensions and facts
+    config:
+      severity: warn
+      
+  - name: test_revenue_reconciliation
+    description: Ensure revenue totals match between order and order item facts
+    config:
+      severity: error
